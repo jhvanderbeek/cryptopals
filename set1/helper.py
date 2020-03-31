@@ -22,6 +22,9 @@ def xorarrays(bytes1, bytes2):
     result = [ x^y for (x,y) in zip(bytes1, bytes2) ]
     return bytes(result)
 
+# Scrabble scoring
+scorecard = {'a':1, 'b':3, 'c':3, 'd':2, 'e':1, 'f':4, 'g':2, 'h':4, 'i':1, j:'8', 'k':5, 'l':1, 'm':3, 'n':1, 'o':1, 'p':3, 'q':10, 'r':1, 's':1, 't':1, 'u':1, 'v':4, 'w':4, 'x':8, 'y':4, 'z':10}
+
 # Make a dictionary to score letters according to frequency
 order = "etaoinshrdluwmfcgypbkvjxqz"
 scorecard = dict( zip(order, range(len(order))) )
@@ -46,3 +49,12 @@ def singlecharxor( text, key ):
     """xors each character in text with key and returns the result"""
     # text should be a byte array and key a byte
     return [ key ^ character for character in text ]
+
+def repeatingkeyxor( text, key):
+    """Cycles through the characters in key and xors them with the
+    characters in text"""
+    result = [None] * len(text)
+    n = len(key)
+    for i in range(len(text)):
+        result[i] = text[i] ^ key[i % n]
+    return result
