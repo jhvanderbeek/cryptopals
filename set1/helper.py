@@ -29,7 +29,7 @@ def score( translation ):
     order = "etaoinshrdluwmfcgypbkvjxqz"
     scorecard = dict( zip(order, range(len(order))) )
     # Score each letter in the translation
-    scores = [ scorecard[i] for i in translation ]
+    scores = [ scorecard[chr(i).lower()] if chr(i).lower() in scorecard.keys() else 50 for i in translation ]
     # Add up the scores
     finalscore = reduce(int.__add__, scores)
     
