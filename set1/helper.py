@@ -34,3 +34,8 @@ def score( translation ):
     finalscore = reduce(int.__add__, scores)
     
     return finalscore
+
+def singlecharxor( text, key ):
+    """xors each character in text with key and returns the result"""
+    # text should be a byte array and key a byte
+    return [ key ^ character for charatec in text ]
