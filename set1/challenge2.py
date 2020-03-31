@@ -6,5 +6,5 @@ key = h.hexstrtobytes(sys.argv[1])
 plaintext = h.hexstrtobytes(sys.argv[2])
 
 # xor them together to get ciphertext
-ciphertext = h.xor(key, plaintext)
+ciphertext = h.xorarrays(key, plaintext)
 print( h.bytestohexstr(ciphertext) )

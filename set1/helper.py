@@ -15,7 +15,7 @@ def bytestohexstr(bytearr):
     hexstr = reduce( str.__add__, hexarr )
     return hexstr
 
-def xor(bytes1, bytes2):
+def xorarrays(bytes1, bytes2):
     """Does an elementwise xor on a bytes object and returns the
     result in a bytes object"""
     n = min( len(bytes1), len(bytes2) )
