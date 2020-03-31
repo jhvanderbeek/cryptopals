@@ -1,5 +1,5 @@
 from math import ceil
-from functool import reduce
+from functools import reduce
 
 def hexstrtobytes(hexstr):
     """Converts a string of hex characters into an array of bytes"""
