@@ -21,3 +21,16 @@ def xor(bytes1, bytes2):
     n = min( len(bytes1), len(bytes2) )
     result = [ x^y for (x,y) in zip(bytes1, bytes2) ]
     return bytes(result)
+
+def score( translation ):
+    """Scores a string according to the frequency of the characters
+    it contains"""
+    # Make a dictionary to score letters according to frequency
+    order = "etaoinshrdluwmfcgypbkvjxqz"
+    scorecard = dict( zip(order, range(len(order))) )
+    # Score each letter in the translation
+    scores = [ scorecard[i] for i in translation ]
+    # Add up the scores
+    finalscore = reduce(int.__add__, scores)
+    
+    return finalscore
