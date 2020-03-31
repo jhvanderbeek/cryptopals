@@ -37,7 +37,12 @@ def score( translation ):
     
     return finalscore
 
+def isreadable( bytearr ):
+    """Determines if the bytes in a byte array represent readable ascii characters"""
+    readableChars = list(range(32, 127))
+    return all( [(char in readableChars) for char in bytearr] )
+
 def singlecharxor( text, key ):
     """xors each character in text with key and returns the result"""
     # text should be a byte array and key a byte
-    return [ key ^ character for charatec in text ]
+    return [ key ^ character for character in text ]
