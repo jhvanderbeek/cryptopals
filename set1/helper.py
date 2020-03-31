@@ -22,12 +22,14 @@ def xorarrays(bytes1, bytes2):
     result = [ x^y for (x,y) in zip(bytes1, bytes2) ]
     return bytes(result)
 
+# Make a dictionary to score letters according to frequency
+order = "etaoinshrdluwmfcgypbkvjxqz"
+scorecard = dict( zip(order, range(len(order))) )
+
 def score( translation ):
     """Scores a string according to the frequency of the characters
     it contains"""
-    # Make a dictionary to score letters according to frequency
-    order = "etaoinshrdluwmfcgypbkvjxqz"
-    scorecard = dict( zip(order, range(len(order))) )
+    
     # Score each letter in the translation
     scores = [ scorecard[chr(i).lower()] if chr(i).lower() in scorecard.keys() else 50 for i in translation ]
     # Add up the scores
