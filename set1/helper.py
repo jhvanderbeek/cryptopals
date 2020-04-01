@@ -1,6 +1,10 @@
 from math import ceil
 from functools import reduce
+# TODO 
+# change imports so ceil and reduce aren't part of the library
+# come up with some nice error messages
 
+# Turns out you can just do bytes.fromhex
 def hexstrtobytes(hexstr):
     """Converts a string of hex characters into an array of bytes"""
     # First split hexstr up into two character chunks (so each chunk is a byte)
@@ -8,7 +12,7 @@ def hexstrtobytes(hexstr):
     # Convert the hex numbers into bytes
     bytearr = bytes(hexarr)
     return bytearr
-
+# Can do this with import binascii; binascii.unhexlify
 def bytestohexstr(bytearr):
     """Converts an array of bytes to a string of hex characters"""
     hexarr = [ "{:02x}".format(i) for i in bytearr ]
@@ -58,3 +62,19 @@ def repeatingkeyxor( text, key):
     for i in range(len(text)):
         result[i] = text[i] ^ key[i % n]
     return result
+
+def tally(bytestring):
+    """Counts the number of ones in a string of bytes"""
+    binlist = [ "{0:b}".format(byte) for byte in bytestring ]
+    binstring = reduce(str.__add__, binlist)
+    return binstring.count('1')
+
+def hammingdistance( string1, string2 ):
+    """Determines the hamming distance between two strings of bytes"""
+    if (len(string1) != len(string2)):
+        # Should come up with some nice error messages
+        return -1
+    # Just need to count up where the strings are different
+    # So xor together then count the 1s
+    diff = [ x^y for (x,y) in zip(string1, string2) ]
+    return tally(diff)
