@@ -78,3 +78,20 @@ def hammingdistance( string1, string2 ):
     # So xor together then count the 1s
     diff = [ x^y for (x,y) in zip(string1, string2) ]
     return tally(diff)
+
+def findbestkeyfor( ciphertext ):
+    """Tries xoring all single byte keys to see which gives the best score"""
+    bestScore = 100 * len(ciphertext)
+    bestKey = 0
+    bestPlain = ciphertext
+    # Try each key and find which gives the best score
+    for key in range(256):
+        # Decrypt the ciphertext using key
+        plain = [ key ^ cipher for cipher in ciphertext ]
+        # If this contains something that isn't a letter or a space then skip it
+        curScore = score(plain)
+        if ( curScore < bestScore ):
+            bestScore = curScore
+            bestPlain = plain
+            bestKey = key
+    return bestKey, bestPlain, bestScore        
