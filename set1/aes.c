@@ -4,44 +4,43 @@
  * https://www.samiam.org/key-schedule.html
  */
 #include <stdlib.h>
+#include <assert.h>
+#define BITS_PER_BYTE   8
 typedef unsigned char Byte;
 
 /**
- * Rotates an array of Bytes of length n to the left by t bits.
+ * Rotates a single byte to the left by n bits.
  * 
- * Takes an array of bytes 'in' of length n and moves the ith element to the
- * (i-t)th position. Bits to the left of the tth position roll around to the 
- * right.
+ * Takes a byte 'in' and moves the ith element to the (i-n)th position. Bits to 
+ * the left of the nth position roll around to the right.
  * @param in    The array of Bytes
- * @param n     The size of the array
- * @param t     The number of bits to shift
+ * @param n     The number of bits to shift (can be negative)
  * 
- * @return out  The rotated array
+ * @return out  The rotated byte
  */
-Byte *rotateBytesLeft( Byte *in, size_t n, size_t t) {
-    Byte *out = malloc( sizeof(Byte) * n );
-    out = (*in << t) || (*in >> (n-t));
+Byte rotateByteLeft( Byte in, int n ) {
+    Byte out = in;
+    n = n % BITS_PER_BYTE;
+    out = (in << n) | (in >> (BITS_PER_BYTE - n));
     return out;
 }
 
 /**
- * Rotates an array of Bytes of length n to the right by t bits.
+ * Rotates a single byte to the right by n bits.
  * 
- * Takes an array of bytes 'in' of length n and moves the ith element to the
- * (i+t)th position. Bits to the right of the (n-t)th position roll around to
- * the left.
+ * Takes a byte 'in' and moves the ith element to the (i+n)th position. Bits to 
+ * the left of the nth position roll around to the right.
  * @param in    The array of Bytes
- * @param n     The size of the array
- * @param t     The number of bits to shift
+ * @param n     The number of bits to shift (can be negative)
  * 
- * @return out  The rotated array
+ * @return out  The rotated byte
  */
-Byte *rotateBytesRight( Byte *in, size_t n, size_t t ) {
-    Byte *out = malloc( sizeof(Byte) * n );
-    out = (*in >> t) || (*in << (n-t));
+Byte rotateByteRight( Byte in, int n ) {
+    Byte out = in;
+    n = n % BITS_PER_BYTE;
+    out = (in >> n) | (in << (BITS_PER_BYTE - n));
     return out;
 }
-
 /**
  * Computes the roundkey for a given round.
  * 
@@ -53,7 +52,7 @@ Byte *rotateBytesRight( Byte *in, size_t n, size_t t ) {
 Byte roundkey( int round ) {
     /* Round must be at least 1 */
     if ( round < 1 ) {
-        return NULL;
+        return 0x00;
     }
     Byte roundkey = 1;
     /* For the first 8 rounds the key is simply shifted*/
@@ -71,8 +70,39 @@ Byte roundkey( int round ) {
              bit is 1 the negative is stored as 0xff, if the highest bit is 
              zero the negative is 0x00. We use this as a mask for the xor 
              constant.*/
-            roundkey = ( roundkey << 1 ) ^ ( 0x1b && -(roundkey >> 7) );
+            roundkey = ( roundkey << 1 ) ^ ( 0x1b & -(roundkey >> 7) );
         }
         return roundkey;
     }
 }
+
+# if defined TEST
+int main () {
+    /* Testing for rotateByteLeft and rotateByteRight*/
+    /* Basic functionality */
+    {
+        Byte testByte = 0x01;
+        assert( rotateByteLeft(testByte, 1) == 0x02 ); 
+        assert( rotateByteRight(testByte, 1) == 0x80 );
+        testByte = 0x80;
+        assert( rotateByteLeft(testByte, 1) == 0x01 );
+        assert( rotateByteRight(testByte, 1) == 0x40 );
+        testByte = 0xaa;
+        assert( rotateByteLeft(testByte, 1) == 0x55 );
+        assert( rotateByteRight(testByte, 1) == 0x55 );
+        testByte = 0xc5;
+        assert( rotateByteLeft(testByte, 3) == 0x2e );
+        assert( rotateByteRight(testByte, 3) == 0xb8 );
+    }
+    /* Unconventional n */
+    {
+        Byte testByte = 0xc5;
+        assert( rotateByteLeft(testByte, 3) == rotateByteRight(testByte, BITS_PER_BYTE - 3) );
+        assert( rotateByteLeft(testByte, 2 + BITS_PER_BYTE) == rotateByteLeft(testByte, 2) );
+        assert( rotateByteRight(testByte, 2 + BITS_PER_BYTE) == rotateByteRight(testByte, 2) );
+    }
+
+    /* Testing for roundkey */
+    
+}
+# endif
