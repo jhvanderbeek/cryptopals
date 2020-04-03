@@ -225,6 +225,42 @@ void generateKeySchedule( Byte *initialKey, Byte **keySchedule ) {
 #define ROWS            4
 
 /**
+ * Prints a 128-bit block nicely
+ * 
+ * @param in    the 128-bit block to print
+ */
+void prettyPrint( Byte *in ) {
+    /* Two characters for each byte plus 1 space delimiter for each gap between 
+    words plus null byte */ 
+    /* Use two characters for each byte in a word plus a space at the end */
+    size_t wordlen = 2*BYTES_PER_WORD + 1;
+    char s[ 4*wordlen ]; 
+
+    for (size_t word = 0; word < WORDS_PER_KEY; ++word) {
+        /* Add each byte of the word */ 
+        for (size_t b = 0; b < BYTES_PER_WORD; ++b) 
+            sprintf( s + word*wordlen + 2*b, "%02x", in[word*WORDS_PER_KEY + b] );
+        /* Add a space at the end */
+        s[ (word+1)*wordlen - 1 ] = ' ';
+    }
+    s[ WORDS_PER_KEY*wordlen - 1 ] = '\0';
+    printf("%s", s);
+    return;
+}
+
+/**
+ * Substitutes all bytes in a 128-bit block using sbox.
+ * 
+ * @param in    The 128-bit block to be substituted
+ */
+void subBytes( Byte *in ) {
+    for (size_t i = 0; i < BLOCK_SIZE; ++i) {
+        in[i] = sbox[in[i]];
+    }
+    return;
+}
+
+/**
  * Jumbles a 128-bit block according to the shift rows step of AES.
  * 
  * The 128-bit block of data is arranged in a 4x4 matrix of bytes so that the 
@@ -326,7 +362,7 @@ void AESencrypt( Byte *data, Byte *key, Byte *cipher ) {
 
     /* Perform round transformations */
     for (size_t round = 1; round < ROUND_KEYS; ++round) {
-        sboxSub( cipher, cipher );
+        subBytes( cipher );
         shiftRows( cipher );
         mixColumns( cipher );
         addroundkey( cipher, keySchedule[round] );
@@ -476,6 +512,12 @@ int main () {
         for(size_t i = 0; i < BYTES_PER_KEY; ++i)
             assert( in[i] == out[i] );
         printf("mixColumns passed testing!\n");
+    }
+
+    /* Test prettyPrint */
+    {
+        Byte out[] = {0x0e, 0xdd, 0x33, 0xd3, 0xc6, 0x21, 0xe5, 0x46, 0x45, 0x5b, 0xd8, 0xba, 0x14, 0x18, 0xbe, 0xc8};
+        prettyPrint(out);
     }
 
     /* Test AESencrypt */
