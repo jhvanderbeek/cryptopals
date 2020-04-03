@@ -218,7 +218,7 @@ void generateKeySchedule( Byte *initialKey, Byte **keySchedule ) {
     return;
 }
 
-////////////// Encrypting ///////////////
+////////////// Encrypting //////////////////
 #define BLOCK_SIZE_BITS 128
 #define BLOCK_SIZE      16      /* Block size in bytes */
 #define COLUMNS         4
@@ -264,9 +264,9 @@ void shiftRows( Byte *in ) {
  * @param in    A 128-bit block of data to be mixed
  */
 void mixColumns( Byte *in ) {
-    Byte tmp[BYTES_PER_KEY];
-    Byte twiceIn[BYTES_PER_KEY];
-    for (size_t i = 0; i < BYTES_PER_KEY; ++i) {
+    Byte tmp[BLOCK_SIZE];
+    Byte twiceIn[BLOCK_SIZE];
+    for (size_t i = 0; i < BLOCK_SIZE; ++i) {
         /* First make a copy of the input */
         tmp[i] = in[i];
         /* Multiplication by 2 is just bitshifting unless the highest bit is 
@@ -285,6 +285,58 @@ void mixColumns( Byte *in ) {
         in[3 + 4*i] = twiceIn[3 + 4*i] ^ tmp[2 + 4*i] ^ tmp[1 + 4*i] ^ twiceIn[0 + 4*i] ^ tmp[0 + 4*i];
     }
 
+}
+
+/**
+ * Adds the round key provided.
+ * 
+ * Performs a bytewise xor between in and roundkey.
+ * @param in        128-bit block of data
+ * @param roundkey  the round key for that round.
+ */
+void addroundkey( Byte *in, Byte *roundkey ) {
+    for (size_t i = 0; i < BLOCK_SIZE; ++i) {
+        in[i] ^= roundkey[i];
+    }
+}
+
+/**
+ * Encrypt a 128-bit block of data according to AES-128 using the key provided.
+ * 
+ * @param data      A 128-bit block of data
+ * @param key       A 128-bit key
+ * @param cipher    A buffer to hold a 128-bit block of encrypted data
+ */
+void AESencrypt( Byte *data, Byte *key, Byte *cipher ) {
+    /* Copy data into cipher */
+    for (size_t i = 0; i < BLOCK_SIZE; ++i)
+        cipher[i] = data[i];
+
+    /* Initialise the key schedule */
+    Byte **keySchedule;
+    keySchedule = malloc( (ROUND_KEYS + 1)*sizeof(Byte*) );
+    for (size_t i = 0; i < ROUND_KEYS + 1; ++i) {
+        keySchedule[i] = malloc( BYTES_PER_KEY * sizeof(Byte) );
+    }
+    /* Generate the key schedule */
+    generateKeySchedule( key, keySchedule );
+
+    /* Initial round key addition */
+    addroundkey( cipher, keySchedule[0] );
+
+    /* Perform round transformations */
+    for (size_t round = 1; round < ROUND_KEYS; ++round) {
+        sboxSub( cipher, cipher );
+        shiftRows( cipher );
+        mixColumns( cipher );
+        addroundkey( cipher, keySchedule[round] );
+    }
+
+    /* Don't mix columns for final round */
+    sboxSub( cipher, cipher);
+    shiftRows( cipher );
+    addroundkey( cipher, keySchedule[ROUND_KEYS] );
+    return;
 }
 
 # if defined TEST
@@ -424,6 +476,19 @@ int main () {
         for(size_t i = 0; i < BYTES_PER_KEY; ++i)
             assert( in[i] == out[i] );
         printf("mixColumns passed testing!\n");
+    }
+
+    /* Test AESencrypt */
+    {
+        Byte key[] = {0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        Byte plain[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        Byte cipher[16];
+        Byte out[] = {0x0e, 0xdd, 0x33, 0xd3, 0xc6, 0x21, 0xe5, 0x46, 0x45, 0x5b, 0xd8, 0xba, 0x14, 0x18, 0xbe, 0xc8};
+        AESencrypt(plain, key, cipher);
+        for (size_t i = 0; i < BLOCK_SIZE; ++i) 
+            assert( cipher[i] == out[i] );
+
+        printf("AESencrypt passed testing!\n");
     }
 }
 # endif
