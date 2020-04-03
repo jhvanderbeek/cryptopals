@@ -227,8 +227,10 @@ void generateKeySchedule( Byte *initialKey, Byte **keySchedule ) {
 /**
  * Jumbles a 128-bit block according to the shift rows step of AES.
  * 
- * The 128-bit block of data is arranged in 4 rows of 4 bytes. The first row is
- * left as is then the ith row is moved i bytes to the left.
+ * The 128-bit block of data is arranged in a 4x4 matrix of bytes so that the 
+ * first four byts of the block represent the first column of the matrix. The 
+ * rows are shifted as follows: the first row is left as is then the ith row is 
+ * rotated i bytes to the left.
  * 
  * @param in    A 128-bit block of data
  */
@@ -246,6 +248,43 @@ void shiftRows( Byte *in ) {
     for (size_t i = 0; i < BLOCK_SIZE; ++i)
         in[i] = tmp[i];
     return;
+}
+
+/**
+ * Jumbles a 128-bit block according to the mix columns step of AES.
+ * 
+ * The 128-bit block is arranged in a 4x4 matrix of bytes. The each column is 
+ * multiplied by the matrix:
+ * 2 3 1 1
+ * 1 2 3 1
+ * 1 1 2 3
+ * 3 1 1 2
+ * where multiplication is carried out in Rijndael's Galois field
+ * 
+ * @param in    A 128-bit block of data to be mixed
+ */
+void mixColumns( Byte *in ) {
+    Byte tmp[BYTES_PER_KEY];
+    Byte twiceIn[BYTES_PER_KEY];
+    for (size_t i = 0; i < BYTES_PER_KEY; ++i) {
+        /* First make a copy of the input */
+        tmp[i] = in[i];
+        /* Multiplication by 2 is just bitshifting unless the highest bit is 
+        set, then we also have to xor with 0x1b */
+        twiceIn[i] = (in[i] << 1 ) ^ ( 0x1b & -(in[i] >> 7) );
+    }
+    for (size_t i = 0; i < COLUMNS; ++i) {
+        /* Perform the matrix multiplication for column j */
+        /* 2 * a0 + a3 + a2 + 3 * a1 */
+        in[0 + 4*i] = twiceIn[0 + 4*i] ^ tmp[3 + 4*i] ^ tmp[2 + 4*i] ^ twiceIn[1 + 4*i] ^ tmp[1 + 4*i];
+        /* 2 * a1 + a0 + a3 + 3 * a2 */
+        in[1 + 4*i] = twiceIn[1 + 4*i] ^ tmp[0 + 4*i] ^ tmp[3 + 4*i] ^ twiceIn[2 + 4*i] ^ tmp[2 + 4*i];
+        /* 2 * a2 + a1 + a0 + 3 * a3 */
+        in[2 + 4*i] = twiceIn[2 + 4*i] ^ tmp[1 + 4*i] ^ tmp[0 + 4*i] ^ twiceIn[3 + 4*i] ^ tmp[3 + 4*i];
+        /* 2 * a3 + a2 + a1 + 3 * a0 */
+        in[3 + 4*i] = twiceIn[3 + 4*i] ^ tmp[2 + 4*i] ^ tmp[1 + 4*i] ^ twiceIn[0 + 4*i] ^ tmp[0 + 4*i];
+    }
+
 }
 
 # if defined TEST
@@ -375,6 +414,16 @@ int main () {
             assert( in[i] == result[i] );
         }
         printf("shiftRows testing passed!\n");
+    }
+
+    /* Test mixColumns */
+    {
+        Byte in[] = {0xdb, 0x13, 0x53, 0x45, 0xf2, 0x0a, 0x22, 0x5c, 0x01, 0x01, 0x01, 0x01, 0x2d, 0x26, 0x31, 0x4c};
+        Byte out[] = {0x8e, 0x4d, 0xa1, 0xbc, 0x9f, 0xdc, 0x58, 0x9d, 0x01, 0x01, 0x01, 0x01, 0x4d, 0x7e, 0xbd, 0xf8};
+        mixColumns(in);
+        for(size_t i = 0; i < BYTES_PER_KEY; ++i)
+            assert( in[i] == out[i] );
+        printf("mixColumns passed testing!\n");
     }
 }
 # endif
