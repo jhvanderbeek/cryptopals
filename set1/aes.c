@@ -5,6 +5,7 @@
  */
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <assert.h>
 #define BITS_PER_BYTE   8
 #define BYTES_PER_WORD  4  
@@ -38,6 +39,43 @@ Defining VVERBOSE causes all functions to print input as well and possibly some 
 */
 
 typedef unsigned char Byte;
+
+//////////////Debugging etc////////////////
+/**
+ * Prints a 128-bit block into a string
+ * 
+ * @param in        the 128-bit block to print
+ * @param string    a buffer to hold the resulting string
+ */
+void prettyPrint( Byte *in, char *string ) {
+    /* Two characters for each byte plus 1 space delimiter for each gap between 
+    words plus null byte */ 
+    /* Use two characters for each byte in a word plus a space at the end */
+
+    for (size_t word = 0; word < WORDS_PER_KEY; ++word) {
+        /* Add each byte of the word */ 
+        for (size_t b = 0; b < BYTES_PER_WORD; ++b) 
+            sprintf( string + word*WORDLEN + 2*b, "%02x", in[word*BYTES_PER_WORD + b] );
+        /* Add a space at the end */
+        string[ (word+1)*WORDLEN - 1 ] = ' ';
+    }
+    string[ WORDS_PER_KEY*WORDLEN - 1 ] = '\0';
+    return;
+}
+
+/**
+ * Checks for equality of two blocks
+ * 
+ * @param a     The first block
+ * @param b     The second block
+ */
+bool compareBlock( Byte *a, Byte *b ) {
+    bool equal = true;
+    for (size_t i = 0; i < BLOCK_SIZE; ++i) {
+        equal = equal && (a[i]==b[i]);
+    }
+    return equal;
+}
 
 //////////////Key Scheduling///////////////
 Byte sbox[] = {0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5,
@@ -267,28 +305,38 @@ void generateKeySchedule( Byte *initialKey, Byte **keySchedule ) {
     return;
 }
 
-////////////// Encrypting //////////////////
 /**
- * Prints a 128-bit block into a string
+ * Adds the round key provided.
  * 
- * @param in        the 128-bit block to print
- * @param string    a buffer to hold the resulting string
+ * Performs a bytewise xor between in and roundkey.
+ * @param in        128-bit block of data
+ * @param roundkey  the round key for that round.
  */
-void prettyPrint( Byte *in, char *string ) {
-    /* Two characters for each byte plus 1 space delimiter for each gap between 
-    words plus null byte */ 
-    /* Use two characters for each byte in a word plus a space at the end */
-
-    for (size_t word = 0; word < WORDS_PER_KEY; ++word) {
-        /* Add each byte of the word */ 
-        for (size_t b = 0; b < BYTES_PER_WORD; ++b) 
-            sprintf( string + word*WORDLEN + 2*b, "%02x", in[word*BYTES_PER_WORD + b] );
-        /* Add a space at the end */
-        string[ (word+1)*WORDLEN - 1 ] = ' ';
+void addroundkey( Byte *in, Byte *roundkey ) {
+    #if defined VERBOSE
+        char instring[BLOCK_STR_LEN];
+    #if defined VVERBOSE
+        char keystring[BLOCK_STR_LEN];
+        prettyPrint(roundkey, keystring);
+        printf( "Adding key:         %s\n", keystring );
+        prettyPrint(in, instring);
+        printf( "To block:           %s\n", instring );
+    #endif
+    #endif
+    
+    for (size_t i = 0; i < BLOCK_SIZE; ++i) {
+        in[i] ^= roundkey[i];
     }
-    string[ WORDS_PER_KEY*WORDLEN - 1 ] = '\0';
+
+    #if defined VERBOSE
+        prettyPrint(in, instring);
+        printf( "Key added:          %s\n", instring );
+    #endif
     return;
 }
+
+////////////// Encrypting //////////////////
+
 
 /**
  * Substitutes all bytes in a 128-bit block using sbox.
@@ -357,7 +405,7 @@ void shiftRows( Byte *in ) {
 /**
  * Jumbles a 128-bit block according to the mix columns step of AES.
  * 
- * The 128-bit block is arranged in a 4x4 matrix of bytes. The each column is 
+ * The 128-bit block is arranged in a 4x4 matrix of bytes. Then each column is 
  * multiplied by the matrix:
  * 2 3 1 1
  * 1 2 3 1
@@ -400,36 +448,6 @@ void mixColumns( Byte *in ) {
     #if defined VERBOSE
         prettyPrint(in, instring);
         printf( "Column mixed:       %s\n", instring );
-    #endif
-    return;
-}
-
-/**
- * Adds the round key provided.
- * 
- * Performs a bytewise xor between in and roundkey.
- * @param in        128-bit block of data
- * @param roundkey  the round key for that round.
- */
-void addroundkey( Byte *in, Byte *roundkey ) {
-    #if defined VERBOSE
-        char instring[BLOCK_STR_LEN];
-    #if defined VVERBOSE
-        char keystring[BLOCK_STR_LEN];
-        prettyPrint(roundkey, keystring);
-        printf( "Adding key:         %s\n", keystring );
-        prettyPrint(in, instring);
-        printf( "To block:           %s\n", instring );
-    #endif
-    #endif
-    
-    for (size_t i = 0; i < BLOCK_SIZE; ++i) {
-        in[i] ^= roundkey[i];
-    }
-
-    #if defined VERBOSE
-        prettyPrint(in, instring);
-        printf( "Key added:          %s\n", instring );
     #endif
     return;
 }
@@ -509,6 +527,143 @@ void AESencrypt( Byte *data, Byte *key, Byte *cipher ) {
     return;
 }
 
+////////////// Decrypting //////////////////
+
+/**
+ * Substitutes all bytes in a 128-bit block using inv_sbox.
+ * 
+ * @param in    The 128-bit block to be substituted
+ */
+void inv_subBytes( Byte *in ) {
+    #if defined VERBOSE
+        char instring[BLOCK_STR_LEN];
+    #if defined VVERBOSE
+        prettyPrint(in, instring);
+        printf( "Input to inv_subBytes:  %s\n", instring );
+    #endif
+    #endif
+    for (size_t i = 0; i < BLOCK_SIZE; ++i) {
+        in[i] = inv_sbox[in[i]];
+    }
+
+    #if defined VERBOSE
+        prettyPrint(in, instring);
+        printf( "Byte substitution:  %s\n", instring );
+    #endif
+    return;
+    return;
+}
+
+/**
+ * Unjumbles a 128-bit block according to the shift rows step of AES.
+ * 
+ * The 128-bit block of data is arranged in a 4x4 matrix of bytes so that the 
+ * first four byts of the block represent the first column of the matrix. The 
+ * rows are rotated according to their position, i.e. the ith row is rotated i 
+ * bytes to the right.
+ * 
+ * @param in    A 128-bit block of data
+ */
+void inv_shiftRows( Byte *in ) {
+    #if defined VERBOSE
+        char instring[BLOCK_STR_LEN];
+    #if defined VVERBOSE
+        prettyPrint(in, instring);
+        printf( "inv_shiftRows input:  %s\n", instring );
+    #endif
+    #endif
+    
+    Byte tmp[BLOCK_SIZE];
+    
+    /* Row i is shifted i places to the left */
+    for (size_t i = 0; i < COLUMNS; ++i) {
+        for (size_t j = 0; j < ROWS; ++j) {
+            tmp[ i + ROWS * j ] = in[ i + ROWS * ((j-i)%COLUMNS) ];
+        }
+    }
+
+    /* Copy tmp into in (if you want to you can just return tmp here) */
+    for (size_t i = 0; i < BLOCK_SIZE; ++i)
+        in[i] = tmp[i];
+    
+    #if defined VERBOSE
+        prettyPrint(in, instring);
+        printf( "Row shifted:        %s\n", instring );
+    #endif
+    return;
+}
+
+/**
+ * Unjumbles a 128-bit block according to the mix columns step of AES.
+ * 
+ * The 128-bit block is arranged in a 4x4 matrix of bytes. Then each column is 
+ * multiplied by the matrix:
+ * 14 11 13  9
+ *  9 14 11 13
+ * 13  9 14 11
+ * 11 13  9 14
+ * 
+ * where multiplication is carried out in Rijndael's Galois field
+ * 
+ * @param in    A 128-bit block of data to be mixed
+ */
+void inv_mixColumns ( Byte *in ) {
+    #if defined VERBOSE
+        char instring[BLOCK_STR_LEN];
+    #if defined VVERBOSE    
+        prettyPrint(in, instring);
+        printf( "mixColumns block in  %s\n", instring );
+    #endif
+    #endif
+    
+    Byte in2[BLOCK_SIZE];
+    Byte in4[BLOCK_SIZE];
+    Byte in8[BLOCK_SIZE];
+    Byte in9[BLOCK_SIZE];
+    Byte in11[BLOCK_SIZE];
+    Byte in13[BLOCK_SIZE];
+    Byte in14[BLOCK_SIZE];
+
+    /* We'll do the matrix multiplication using powers of two */
+    for (size_t i = 0; i < BLOCK_SIZE; ++i) {
+        /* Multiplication by 2 is just bitshifting unless the highest bit is 
+        set, then we also have to xor with 0x1b */
+        in2[i] = (in[i] << 1 ) ^ ( 0x1b & -(in[i] >> 7) );
+        in4[i] = (in2[i] << 1 ) ^ ( 0x1b & -(in2[i] >> 7) );
+        in8[i] = (in4[i] << 1 ) ^ ( 0x1b & -(in4[i] >> 7) );
+        in9[i] = in8[i] ^ in[i];
+        in11[i] = in8[i] ^ in2[i] ^ in[i];
+        in13[i] = in8[i] ^ in4[i] ^ in[i];
+        in14[i] = in8[i] ^ in4[i] ^ in2[i];
+    }
+
+
+    for (size_t i = 0; i < COLUMNS; ++i) {
+        /* Perform the matrix multiplication for column j */
+        /* 14*c0 + 11*c1 + 13*c2 + 9*c3 */
+        in[0 + 4*i] = in14[0 + 4*i] ^ in11[1 + 4*i] ^ in13[2 + 4*i] ^ in9[3 + 4*i];
+        /* 9*c0 + 14*c1 + 11*c2 + 13*c3 */
+        in[1 + 4*i] = in9[0 + 4*i] ^ in14[1 + 4*i] ^ in11[2 + 4*i] ^ in13[3 + 4*i];
+        /* 13*c0 + 9*c1 + 14*c2 + 11*c3 */
+        in[2 + 4*i] = in13[0 + 4*i] ^ in9[1 + 4*i] ^ in14[2 + 4*i] ^ in11[3 + 4*i];
+        /* 11*c0 + 13*c1 + 9*c2 + 14*c3 */
+        in[3 + 4*i] = in11[0 + 4*i] ^ in13[1 + 4*i] ^ in9[2 + 4*i] ^ in14[3 + 4*i];
+    }
+
+    #if defined VERBOSE
+        prettyPrint(in, instring);
+        printf( "Column mixed:       %s\n", instring );
+    #endif
+    return;
+}
+
+/**
+ * Decrypt a 128-bit block of data according to AES-128 using the key provided.
+ * 
+ * @param cipher    A 128-bit block of encrypted data
+ * @param key       A 128-bit key
+ * @param plain     A buffer to hold a 128-bit block of data
+ */
 void AESdecrypt( Byte *cipher, Byte *key, Byte *plain ) {
     #if defined VERBOSE
         char plainstring[BLOCK_STR_LEN];
@@ -520,9 +675,9 @@ void AESdecrypt( Byte *cipher, Byte *key, Byte *plain ) {
         printf( "Using key:\n%s\n", keystring );
     #endif
     
-    /* Copy data into cipher */
+    /* Copy cipher into plain */
     for (size_t i = 0; i < BLOCK_SIZE; ++i)
-        cipher[i] = data[i];
+        plain[i] = cipher[i];
 
     /* Initialise the key schedule */
     Byte **keySchedule;
@@ -533,6 +688,44 @@ void AESdecrypt( Byte *cipher, Byte *key, Byte *plain ) {
     #if defined VERBOSE
         printf("Generating key schedule\n");
     #endif
+    generateKeySchedule( key, keySchedule );
+    #if defined VERBOSE
+        for (size_t i = 0; i <= ROUND_KEYS; ++i) {
+            prettyPrint(keySchedule[i], keystring);
+            printf("Key for Round %i: %s\n", (int) i, keystring);
+        }
+    #endif
+
+    #if defined VERBOSE
+        printf("\n--Inverting round %i--\n", ROUND_KEYS);
+    #endif
+    addroundkey( plain, keySchedule[ROUND_KEYS] );
+    inv_shiftRows( plain );
+    inv_subBytes( plain );
+
+    for (size_t round = ROUND_KEYS - 1; round > 0; --round) {
+        #if defined VERBOSE
+            printf("\n--Inverting round %i--\n", (int) round);
+            prettyPrint(plain, plainstring);
+            printf("Current state:      %s\n", plainstring);
+        #endif
+        addroundkey( plain, keySchedule[round] );
+        inv_mixColumns( plain );
+        inv_shiftRows( plain );
+        inv_subBytes( plain );
+    }
+
+    /* Invert initial xor with key */
+    #if defined VERBOSE
+        printf("\n--Inverting round 0--\n");
+    #endif
+    addroundkey( plain, keySchedule[0] );
+    #if defined VERBOSE
+        printf("\n==Final Result==\n");
+        prettyPrint(plain, plainstring);
+        printf("%s\n", plainstring);
+    #endif
+    return;
 }
 
 # if defined TEST
@@ -681,6 +874,45 @@ int main () {
         prettyPrint(out, outstr);
         printf("%s\n", outstr);
     }
+
+    /* Test compareBlock */
+    {
+        Byte a[] = {0x0e, 0xdd, 0x33, 0xd3, 0xc6, 0x21, 0xe5, 0x46, 0x45, 0x5b, 0xd8, 0xba, 0x14, 0x18, 0xbe, 0xc8};
+        Byte b[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        Byte c[] = {0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        assert( compareBlock(a, a) );
+        assert( !compareBlock(a, b) );
+        assert( !compareBlock(b, c) );
+        printf("compareBlock passed testing!\n");
+    }
+
+    /* Test inv_subBytes */
+    {
+        Byte a[] = {0x0e, 0xdd, 0x33, 0xd3, 0xc6, 0x21, 0xe5, 0x46, 0x45, 0x5b, 0xd8, 0xba, 0x14, 0x18, 0xbe, 0xc8};
+        Byte b[] = {0x0e, 0xdd, 0x33, 0xd3, 0xc6, 0x21, 0xe5, 0x46, 0x45, 0x5b, 0xd8, 0xba, 0x14, 0x18, 0xbe, 0xc8};
+        subBytes(a);
+        inv_subBytes(a);
+        assert( compareBlock(a, b) );
+        printf("inv_subBytes passed testing!\n");
+    }
+
+    /* Test inverse shift rows */
+    {
+        Byte in[] = {0x00, 0x05, 0x0a, 0x0f, 0x04, 0x09, 0x0e, 0x03, 0x08, 0x0d, 0x02, 0x07, 0x0c, 0x01, 0x06, 0x0b};
+        Byte result[] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f};
+        inv_shiftRows(in);
+        assert( compareBlock(in, result) );
+        printf("inv_shiftRows testing passed!\n");
+    }
+
+    /* Test inv_mixColumns */
+    {
+        Byte in[] = {0x8e, 0x4d, 0xa1, 0xbc, 0x9f, 0xdc, 0x58, 0x9d, 0x01, 0x01, 0x01, 0x01, 0x4d, 0x7e, 0xbd, 0xf8};
+        Byte out[] = {0xdb, 0x13, 0x53, 0x45, 0xf2, 0x0a, 0x22, 0x5c, 0x01, 0x01, 0x01, 0x01, 0x2d, 0x26, 0x31, 0x4c};
+        inv_mixColumns(in);
+        assert( compareBlock(in, out) );
+        printf("inv_mixColumns passed testing!\n");
+    }
     #endif
 
     /* Test AESencrypt */
@@ -690,10 +922,24 @@ int main () {
         Byte cipher[16];
         Byte out[] = {0x0e, 0xdd, 0x33, 0xd3, 0xc6, 0x21, 0xe5, 0x46, 0x45, 0x5b, 0xd8, 0xba, 0x14, 0x18, 0xbe, 0xc8};
         AESencrypt(plain, key, cipher);
-        for (size_t i = 0; i < BLOCK_SIZE; ++i) 
-            assert( cipher[i] == out[i] );
+        
+        assert( compareBlock(cipher, out) );
 
         printf("AESencrypt passed testing!\n");
+    }
+
+    /* Test AESdecrypt */
+    {
+        Byte cipher[] = { 0x0e, 0xdd, 0x33, 0xd3, 0xc6, 0x21, 0xe5, 0x46, 0x45, 0x5b, 0xd8, 0xba, 0x14, 0x18, 0xbe, 0xc8 };
+        Byte key[] = {0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        Byte plain[16];
+        Byte expected[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        
+        AESdecrypt(cipher, key, plain);
+        
+        assert( compareBlock(plain, expected) );
+
+        printf("AESdecrypt passed testing!\n");
     }
 }
 # endif
