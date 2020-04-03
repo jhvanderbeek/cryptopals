@@ -15,7 +15,7 @@
 // #define TEST
 typedef unsigned char Byte;
 
-
+//////////////Key Scheduling///////////////
 Byte sbox[] = {0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5,
         0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
         0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0,
@@ -218,6 +218,36 @@ void generateKeySchedule( Byte *initialKey, Byte **keySchedule ) {
     return;
 }
 
+////////////// Encrypting ///////////////
+#define BLOCK_SIZE_BITS 128
+#define BLOCK_SIZE      16      /* Block size in bytes */
+#define COLUMNS         4
+#define ROWS            4
+
+/**
+ * Jumbles a 128-bit block according to the shift rows step of AES.
+ * 
+ * The 128-bit block of data is arranged in 4 rows of 4 bytes. The first row is
+ * left as is then the ith row is moved i bytes to the left.
+ * 
+ * @param in    A 128-bit block of data
+ */
+void shiftRows( Byte *in ) {
+    Byte tmp[BLOCK_SIZE];
+    
+    /* Row i is shifted i places to the left */
+    for (size_t i = 0; i < COLUMNS; ++i) {
+        for (size_t j = 0; j < ROWS; ++j) {
+            tmp[ i + ROWS * j ] = in[ i + ROWS * ((j+i)%COLUMNS) ];
+        }
+    }
+
+    /* Copy tmp into in (if you want to you can just return tmp here */
+    for (size_t i = 0; i < BLOCK_SIZE; ++i)
+        in[i] = tmp[i];
+    return;
+}
+
 # if defined TEST
 int main () {
     /* Testing for rotateByteLeft and rotateByteRight*/
@@ -242,8 +272,8 @@ int main () {
         assert( rotateByteLeft(testByte, 3) == rotateByteRight(testByte, BITS_PER_BYTE - 3) );
         assert( rotateByteLeft(testByte, 2 + BITS_PER_BYTE) == rotateByteLeft(testByte, 2) );
         assert( rotateByteRight(testByte, 2 + BITS_PER_BYTE) == rotateByteRight(testByte, 2) );
+        printf("rotateByteLeft and rotateByteRight passed testing!\n");
     }
-    printf("rotateByteLeft and rotateByteRight passed testing!\n");
 
     /* Testing for rotateWordLeft and rotateWordRight*/
     {
@@ -259,8 +289,8 @@ int main () {
         for (size_t i = 0; i < 4; ++i) {
             assert(test[i] == testword2[i]);
         }
+        printf("rotateWordLeft and rotateWordRight passed testing!\n");
     }
-    printf("rotateWordLeft and rotateWordRight passed testing!\n");
 
     /* Testing for roundconstant */
     {
@@ -268,8 +298,8 @@ int main () {
         for (size_t i = 1; i < 16; ++i) {
             assert( roundconstant(i) == testvectors[i] );
         }
+        printf("roundconstant passed testing!\n");
     }
-    printf("roundconstant passed testing!\n");
 
     /* Testing for sboxSub */
     {
@@ -280,8 +310,8 @@ int main () {
         for (size_t i = 0; i < 4; ++i) {
             assert( result[i] == cmp[i] );
         }
+        printf("sboxSub testing passed!\n");
     }
-    printf("sboxSub testing passed!\n");
 
     /* Testing for generateKeySchedule */
     {
@@ -334,6 +364,17 @@ int main () {
         }
 
         printf("generateKeySchedule passed the test!\n");
+    }
+
+    /* Test shift rows */
+    {
+        Byte in[] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f};
+        Byte result[] = {0x00, 0x05, 0x0a, 0x0f, 0x04, 0x09, 0x0e, 0x03, 0x08, 0x0d, 0x02, 0x07, 0x0c, 0x01, 0x06, 0x0b};
+        shiftRows(in);
+        for (size_t i = 0; i < BLOCK_SIZE; ++i) {
+            assert( in[i] == result[i] );
+        }
+        printf("shiftRows testing passed!\n");
     }
 }
 # endif
