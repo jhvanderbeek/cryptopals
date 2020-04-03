@@ -9,10 +9,19 @@
 #define BITS_PER_BYTE   8
 #define BYTES_PER_WORD  4  
 #define BITS_PER_KEY    128
-#define BYTES_PER_KEY   BITS_PER_KEY / BITS_PER_BYTE
-#define WORDS_PER_KEY   BYTES_PER_KEY / BYTES_PER_WORD
+#define BYTES_PER_KEY   ((BITS_PER_KEY) / (BITS_PER_BYTE))
+#define WORDS_PER_KEY   ((BYTES_PER_KEY) / (BYTES_PER_WORD))
 #define ROUND_KEYS      10
+
 // #define TEST
+// #define VERBOSE
+// #define VVERBOSE
+/*
+Defining TEST will run the test script in main.
+Defining VERBOSE will cause functions to print their output and AESencrypt to document steps as it encrypts.
+Defining VVERBOSE causes all functions to print input as well and possibly some other things.
+*/
+
 typedef unsigned char Byte;
 
 //////////////Key Scheduling///////////////
@@ -224,27 +233,33 @@ void generateKeySchedule( Byte *initialKey, Byte **keySchedule ) {
 #define COLUMNS         4
 #define ROWS            4
 
+/* the number of chars need to represent a word in hex */
+#define WORDLEN         (2 * (BYTES_PER_WORD) + 1) 
+#define BLOCK_STR_LEN   ((WORDLEN) * 4) /* four words in a block */
+
+// Watch those brackets on the #defines for the love of god
+// printf("BLOCK_STR_LEN evaluates to: %i\n", BLOCK_STR_LEN);
+// printf("WORDLEN is: %i\n", WORDLEN);
+
 /**
- * Prints a 128-bit block nicely
+ * Prints a 128-bit block into a string
  * 
- * @param in    the 128-bit block to print
+ * @param in        the 128-bit block to print
+ * @param string    a buffer to hold the resulting string
  */
-void prettyPrint( Byte *in ) {
+void prettyPrint( Byte *in, char *string ) {
     /* Two characters for each byte plus 1 space delimiter for each gap between 
     words plus null byte */ 
     /* Use two characters for each byte in a word plus a space at the end */
-    size_t wordlen = 2*BYTES_PER_WORD + 1;
-    char s[ 4*wordlen ]; 
 
     for (size_t word = 0; word < WORDS_PER_KEY; ++word) {
         /* Add each byte of the word */ 
         for (size_t b = 0; b < BYTES_PER_WORD; ++b) 
-            sprintf( s + word*wordlen + 2*b, "%02x", in[word*WORDS_PER_KEY + b] );
+            sprintf( string + word*WORDLEN + 2*b, "%02x", in[word*BYTES_PER_WORD + b] );
         /* Add a space at the end */
-        s[ (word+1)*wordlen - 1 ] = ' ';
+        string[ (word+1)*WORDLEN - 1 ] = ' ';
     }
-    s[ WORDS_PER_KEY*wordlen - 1 ] = '\0';
-    printf("%s", s);
+    string[ WORDS_PER_KEY*WORDLEN - 1 ] = '\0';
     return;
 }
 
@@ -254,9 +269,22 @@ void prettyPrint( Byte *in ) {
  * @param in    The 128-bit block to be substituted
  */
 void subBytes( Byte *in ) {
+    #if defined VERBOSE
+        char instring[BLOCK_STR_LEN];
+    #if defined VVERBOSE
+        prettyPrint(in, instring);
+        printf( "subBytes block in  %s\n", instring );
+    #endif
+    #endif
+
     for (size_t i = 0; i < BLOCK_SIZE; ++i) {
         in[i] = sbox[in[i]];
     }
+
+    #if defined VERBOSE
+        prettyPrint(in, instring);
+        printf( "Byte substitution:  %s\n", instring );
+    #endif
     return;
 }
 
@@ -271,6 +299,14 @@ void subBytes( Byte *in ) {
  * @param in    A 128-bit block of data
  */
 void shiftRows( Byte *in ) {
+    #if defined VERBOSE
+        char instring[BLOCK_STR_LEN];
+    #if defined VVERBOSE
+        prettyPrint(in, instring);
+        printf( "shiftRows block in  %s\n", instring );
+    #endif
+    #endif
+    
     Byte tmp[BLOCK_SIZE];
     
     /* Row i is shifted i places to the left */
@@ -283,6 +319,11 @@ void shiftRows( Byte *in ) {
     /* Copy tmp into in (if you want to you can just return tmp here */
     for (size_t i = 0; i < BLOCK_SIZE; ++i)
         in[i] = tmp[i];
+    
+    #if defined VERBOSE
+        prettyPrint(in, instring);
+        printf( "Row shifted:        %s\n", instring );
+    #endif
     return;
 }
 
@@ -300,6 +341,14 @@ void shiftRows( Byte *in ) {
  * @param in    A 128-bit block of data to be mixed
  */
 void mixColumns( Byte *in ) {
+    #if defined VERBOSE
+        char instring[BLOCK_STR_LEN];
+    #if defined VVERBOSE    
+        prettyPrint(in, instring);
+        printf( "mixColumns block in  %s\n", instring );
+    #endif
+    #endif
+    
     Byte tmp[BLOCK_SIZE];
     Byte twiceIn[BLOCK_SIZE];
     for (size_t i = 0; i < BLOCK_SIZE; ++i) {
@@ -321,6 +370,11 @@ void mixColumns( Byte *in ) {
         in[3 + 4*i] = twiceIn[3 + 4*i] ^ tmp[2 + 4*i] ^ tmp[1 + 4*i] ^ twiceIn[0 + 4*i] ^ tmp[0 + 4*i];
     }
 
+    #if defined VERBOSE
+        prettyPrint(in, instring);
+        printf( "Column mixed:       %s\n", instring );
+    #endif
+    return;
 }
 
 /**
@@ -331,9 +385,26 @@ void mixColumns( Byte *in ) {
  * @param roundkey  the round key for that round.
  */
 void addroundkey( Byte *in, Byte *roundkey ) {
+    #if defined VERBOSE
+        char instring[BLOCK_STR_LEN];
+    #if defined VVERBOSE
+        char keystring[BLOCK_STR_LEN];
+        prettyPrint(roundkey, keystring);
+        printf( "Adding key:         %s\n", keystring );
+        prettyPrint(in, instring);
+        printf( "To block:           %s\n", instring );
+    #endif
+    #endif
+    
     for (size_t i = 0; i < BLOCK_SIZE; ++i) {
         in[i] ^= roundkey[i];
     }
+
+    #if defined VERBOSE
+        prettyPrint(in, instring);
+        printf( "Key added:          %s\n", instring );
+    #endif
+    return;
 }
 
 /**
@@ -344,6 +415,16 @@ void addroundkey( Byte *in, Byte *roundkey ) {
  * @param cipher    A buffer to hold a 128-bit block of encrypted data
  */
 void AESencrypt( Byte *data, Byte *key, Byte *cipher ) {
+    #if defined VERBOSE
+        char datastring[BLOCK_STR_LEN];
+        char keystring[BLOCK_STR_LEN];
+        char cipherstring[BLOCK_STR_LEN];
+        prettyPrint(data, datastring);
+        prettyPrint(key, keystring);
+        printf( "Encrypting with key:\n%s\n", keystring );
+        printf( "Data:\n%s\n", datastring );
+    #endif
+    
     /* Copy data into cipher */
     for (size_t i = 0; i < BLOCK_SIZE; ++i)
         cipher[i] = data[i];
@@ -354,29 +435,56 @@ void AESencrypt( Byte *data, Byte *key, Byte *cipher ) {
     for (size_t i = 0; i < ROUND_KEYS + 1; ++i) {
         keySchedule[i] = malloc( BYTES_PER_KEY * sizeof(Byte) );
     }
+    #if defined VERBOSE
+        printf("Generating key schedule\n");
+    #endif
     /* Generate the key schedule */
     generateKeySchedule( key, keySchedule );
+    #if defined VERBOSE
+        for (size_t i = 0; i <= ROUND_KEYS; ++i) {
+            prettyPrint(keySchedule[i], keystring);
+            printf("Key for Round %i: %s\n", (int) i, keystring);
+        }
+    #endif
 
+    #if defined VERBOSE
+        printf("\n--Initial Round--\n");
+    #endif
     /* Initial round key addition */
     addroundkey( cipher, keySchedule[0] );
 
     /* Perform round transformations */
     for (size_t round = 1; round < ROUND_KEYS; ++round) {
+        #if defined VERBOSE
+            printf("\n--Round %i--\n", (int) round);
+            prettyPrint(cipher, cipherstring);
+            printf("Current state:      %s\n", cipherstring);
+        #endif
         subBytes( cipher );
         shiftRows( cipher );
         mixColumns( cipher );
         addroundkey( cipher, keySchedule[round] );
     }
 
+    #if defined VERBOSE
+        printf("\n--Round %i--\n", ROUND_KEYS);
+    #endif
     /* Don't mix columns for final round */
-    sboxSub( cipher, cipher);
+    subBytes( cipher );
     shiftRows( cipher );
     addroundkey( cipher, keySchedule[ROUND_KEYS] );
+
+    #if defined VERBOSE
+        printf("\n==Final Result==\n");
+        prettyPrint(cipher, cipherstring);
+        printf("%s\n", cipherstring);
+    #endif
     return;
 }
 
 # if defined TEST
 int main () {
+    #if defined TEST1
     /* Testing for rotateByteLeft and rotateByteRight*/
     /* Basic functionality */
     {
@@ -513,12 +621,14 @@ int main () {
             assert( in[i] == out[i] );
         printf("mixColumns passed testing!\n");
     }
-
     /* Test prettyPrint */
     {
         Byte out[] = {0x0e, 0xdd, 0x33, 0xd3, 0xc6, 0x21, 0xe5, 0x46, 0x45, 0x5b, 0xd8, 0xba, 0x14, 0x18, 0xbe, 0xc8};
-        prettyPrint(out);
+        char outstr[BLOCK_STR_LEN];
+        prettyPrint(out, outstr);
+        printf("%s\n", outstr);
     }
+    #endif
 
     /* Test AESencrypt */
     {
