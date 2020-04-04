@@ -1,7 +1,9 @@
+# Access functions from c library
 from ctypes import *
 sofilename = "/home/daniel/Projects/cryptopals/set1/aes.so"
 aes = CDLL(sofilename)
 
+# Set key
 key = create_string_buffer(b"YELLOW SUBMARINE")
 
 # Read in ciphertext
