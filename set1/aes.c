@@ -1,7 +1,7 @@
 /**
  * Some code for aes encryption, sticking to 128 bit keys for now
  * 
- * https://www.samiam.org/key-schedule.html
+ * gcc -DTEST -DVERBOSE -o aestest aes.c 
  */
 #include <stdlib.h>
 #include <stdio.h>
