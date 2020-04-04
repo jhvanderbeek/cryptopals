@@ -1,7 +1,10 @@
 /**
  * Some code for aes encryption, sticking to 128 bit keys for now
  * 
- * gcc -DTEST -DVERBOSE -o aestest aes.c 
+ * To run tests compile with
+ * gcc -DTEST -DTESTALL -DVERBOSE -o aestest aes.c
+ * To compile as a library for python 
+ * gcc  -fPIC -shared -o AES.so aes.c
  */
 #include <stdlib.h>
 #include <stdio.h>
