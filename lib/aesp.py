@@ -86,3 +86,23 @@ def is_ECB( ciphertext ):
     blocks = [ ciphertext[BLOCK_SIZE*i:BLOCK_SIZE*(i+1)] for i in range(num_blocks) ]
     # Check if any blocks are repeated
     return len(set(blocks)) != len(blocks)
+
+from base64 import b64decode
+import random
+KEY_SIZE = 16
+
+def getrandkey(n):
+    """Generate a random n-byte key"""
+    return bytes([ random.getrandbits(8) for _ in range(n) ])
+
+
+def oracle12( prefix ):
+    """Prepends the EXTRA string with prefix and then encrypts it using ECB"""
+
+    random.seed(1)
+    KEY = getrandkey(KEY_SIZE)
+
+    EXTRA = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK"
+    EXTRA = b64decode(EXTRA)
+    plain = prefix + EXTRA
+    return AES_ECB_encrypt( plain, KEY )
