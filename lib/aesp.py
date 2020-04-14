@@ -79,3 +79,10 @@ def AES_CBC_decrypt( ciphertext, key, IV ):
         IV = cipherblock
     return plaintext
 
+def is_ECB( ciphertext ):
+    """Looks for repeated blocks in a ciphertext. This is a giveaway that something is encrypted in ECB mode"""
+    # Chop up ciphertext into blocks
+    num_blocks = len(ciphertext) // BLOCK_SIZE
+    blocks = [ ciphertext[BLOCK_SIZE*i:BLOCK_SIZE*(i+1)] for i in range(num_blocks) ]
+    # Check if any blocks are repeated
+    return len(set(blocks)) != len(blocks)
