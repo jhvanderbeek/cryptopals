@@ -1,3 +1,6 @@
-# Adds padding to a string of bytes so that the length is a multiple of 16
-def pad(text):
-    
+
+def pad(text, n):
+    """Adds padding to a string of bytes to make it length n. If the string is longer than n it will return the first n bytes of text"""
+    if ( len(text) > n ):
+        return text[:n]
+    return text + b'\x04'*(n - len(text))
