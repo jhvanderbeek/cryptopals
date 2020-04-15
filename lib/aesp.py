@@ -4,6 +4,7 @@ sofilename = "/home/daniel/Projects/cryptopals/lib/aes.so"
 aes = CDLL(sofilename)
 BLOCK_SIZE = 16
 
+# AES functions
 def pad( text ):
     """Adds padding to a string of bytes to make it a multiple of BLOCK_SIZE."""
     r = len(text)%BLOCK_SIZE
@@ -89,25 +90,29 @@ def is_ECB( ciphertext ):
     # Check if any blocks are repeated
     return len(set(blocks)) != len(blocks)
 
+# Some globals for challenges
 from base64 import b64decode
 import random
 KEY_SIZE = 16
+MESSAGE64 = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK"
+MESSAGE = b64decode(MESSAGE64)
+random.seed(1)
 
 def getrandkey(n):
     """Generate a random n-byte key"""
     return bytes([ random.getrandbits(8) for _ in range(n) ])
 
+KEY = getrandkey(KEY_SIZE)
+prefixsize = random.randint(10, 20)
+PREFIX = bytes([ random.getrandbits(8) for _ in range(prefixsize) ])
+
+# Challenge 12 functions
 def oracle12( prefix ):
-    """Prepends the EXTRA string with prefix and then encrypts it using ECB"""
-
-    random.seed(1)
-    KEY = getrandkey(KEY_SIZE)
-
-    EXTRA = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK"
-    EXTRA = b64decode(EXTRA)
-    plain = prefix + EXTRA
+    """Prefixes MESSAGE with prefix0 and then encrypts it using ECB"""
+    plain = prefix + MESSAGE
     return AES_ECB_encrypt( plain, KEY )
 
+# Challenge 13 functions
 def profile_for( usermail ):
     if ('&' in usermail or '=' in usermail):
         raise ValueError("Email cannot contain & or = characters")
@@ -133,3 +138,9 @@ def decrypt13( encryptedprofile ):
     profile = AES_ECB_decrypt( encryptedprofile, key )
     profile = profile.decode().strip('\x04')
     return kvparse(profile)
+
+#Challenge 14 functions
+def oracle14( textbytes ):
+    """Inserts text inbetween PREFIX and MESSAGE then encrypts the whole thing and returns it"""
+    plain = PREFIX + textbytes + MESSAGE
+    return AES_ECB_encrypt(plain, KEY)
