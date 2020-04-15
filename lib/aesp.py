@@ -32,8 +32,10 @@ def AES_ECB_decrypt( ciphertext, key ):
     # Decrypt the ciphertext one block at a time
     plaintext = b''
     plainblock = create_string_buffer(BLOCK_SIZE)
-    for i in range(len(cipherbytes) // BLOCK_SIZE):
-        aes.AESdecrypt( cipherbytes[BLOCK_SIZE*i : BLOCK_SIZE*i+BLOCK_SIZE], key, plainblock )
+    cipherblock = create_string_buffer(BLOCK_SIZE)
+    for i in range(len(ciphertext) // BLOCK_SIZE):
+        cipherblock = ciphertext[BLOCK_SIZE*i : BLOCK_SIZE*i+BLOCK_SIZE]
+        aes.AESdecrypt( cipherblock, key, plainblock )
         plaintext += bytes(plainblock)
     return plaintext
 
@@ -95,7 +97,6 @@ def getrandkey(n):
     """Generate a random n-byte key"""
     return bytes([ random.getrandbits(8) for _ in range(n) ])
 
-
 def oracle12( prefix ):
     """Prepends the EXTRA string with prefix and then encrypts it using ECB"""
 
@@ -106,3 +107,29 @@ def oracle12( prefix ):
     EXTRA = b64decode(EXTRA)
     plain = prefix + EXTRA
     return AES_ECB_encrypt( plain, KEY )
+
+def profile_for( usermail ):
+    if ('&' in usermail or '=' in usermail):
+        raise ValueError("Email cannot contain & or = characters")
+    USERCOUNT = 10
+    profile = "email={0}&UID={1}&role={2}".format(usermail, USERCOUNT, "user")
+    return profile
+
+def oracle13( usermail ):
+    """Generates a user profile using usermail and encrypts it"""
+    random.seed(1)
+    key = getrandkey( KEY_SIZE )
+    profile = profile_for( usermail )
+    return AES_ECB_encrypt( profile.encode(), key )
+
+def kvparse( text ):
+    pairs = text.split('&')
+    pairs = [ pair.split('=') for pair in pairs ]
+    return { pair[0]:pair[1] for pair in pairs }
+
+def decrypt13( encryptedprofile ):
+    random.seed(1)
+    key = getrandkey( KEY_SIZE )
+    profile = AES_ECB_decrypt( encryptedprofile, key )
+    profile = profile.decode().strip('\x04')
+    return kvparse(profile)
