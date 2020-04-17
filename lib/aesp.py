@@ -139,8 +139,121 @@ def decrypt13( encryptedprofile ):
     profile = profile.decode().strip('\x04')
     return kvparse(profile)
 
-#Challenge 14 functions
+# Challenge 14 functions
 def oracle14( textbytes ):
     """Inserts text inbetween PREFIX and MESSAGE then encrypts the whole thing and returns it"""
     plain = PREFIX + textbytes + MESSAGE
     return AES_ECB_encrypt(plain, KEY)
+
+IV = getrandkey(KEY_SIZE)
+
+# Challenge 16 functions
+import re
+def oracle16( userdata ):
+    """Inserts userdata between the prefix and suffix strings and then 
+    encrypts"""
+    # Don't allow the string to end in an escape character ('\\'=92 in ascii)
+    if len(userdata) > 0 and userdata[-1] == 92:
+        raise ValueError("userdata cannot end in \\")
+    prefix = b"comment1=cooking%20MCs;userdata="
+    suffix = b";comment2=%20like%20a%20pound%20of%20bacon"
+    # First add escape characters to all ; and = in userdata
+    userdata = userdata.split(b';')
+    userdata = b'\;'.join(userdata)
+    userdata = userdata.split(b'=')
+    userdata = b'\='.join(userdata)
+    # print(prefix + userdata + suffix)
+    return AES_CBC_encrypt( prefix + userdata + suffix, KEY, IV)
+
+def isadmin( encdata ):
+    """Decrypts the string encdata and looks for the string ';admin=true;'"""
+    data = str(AES_CBC_decrypt( encdata, KEY, IV ))
+    data = re.split(r'(?<!\\);', data)
+    data = [ re.split( r'(?<!\\)=', x ) for x in data ]
+    data = dict(data)
+    if "admin" in data and data["admin"] == "true":
+        return True
+    else:
+        return False
+
+def determineBlocksize( blockcipher ):
+    """Expects a function that takes in text and ecrypts it possibly in addition to some text before and after using a block cipher. This function will determine the size of the blocks by enrcypting succesively larger plaintexts and seeing when the size of the ciphertext jumps"""
+    insert = b''
+    cipher = blockcipher( insert )
+    initialsize = len( cipher )
+    # First add prefixes until we get to the start of a jump
+    while ( len(cipher) == initialsize ):
+        insert += b'A'
+        cipher = blockcipher( insert )
+    # Now start counting how many until the next jump
+    initialsize = len(cipher)
+    blocksize = 0
+    while ( len(cipher) == initialsize ):
+        insert += b'A'
+        blocksize += 1
+        cipher = blockcipher( insert )
+    return blocksize
+
+def determineInsertPosition( blockcipher, blocksize ):
+    """Determines where text is being inserted by detecting changes in the cipher"""
+    # Start by inserting text of length blocksize
+    insert = bytearray( blocksize + 1 )
+    fixedcipher = blockcipher( insert )
+    
+    # Change the insert at the start
+    insert[0] = 1
+    cipher = blockcipher( insert )
+    numBlocks = len(cipher) // blocksize
+
+    # Find where the blocks change
+    fixedblocks = [ fixedcipher[i*blocksize:(i+1)*blocksize] for i in range(numBlocks) ]
+    cipherblocks = [ cipher[i*blocksize:(i+1)*blocksize] for i in range(numBlocks) ]
+    
+    diff = [ a != b for a,b in zip(fixedblocks, cipherblocks) ]
+    startblock = diff.index(True)
+    diffblock = startblock
+    count = 0
+    # Change successive letters in insert until a different block changes
+    while diffblock == startblock:
+        count += 1
+        insert = bytearray(blocksize + 1)
+        insert[count] = 1
+
+        cipher = blockcipher( insert )
+        cipherblocks = [ cipher[i*blocksize:(i+1)*blocksize] for i in range(numBlocks) ]
+        
+        diff = [ a != b for a,b in zip(fixedblocks, cipherblocks) ]
+        diffblock = diff.index(True)
+
+    assert(count < blocksize + 1)
+    # If insert starts at the start of a block the count will go over
+    if count == blocksize:
+        return blocksize * startblock
+
+    return blocksize*(startblock + 1) - count
+
+    # if len(cipherblocks) != len(set(cipherblocks)):
+    #     print("Repeat blocks found in unaltered cipher watch out!!!")
+    # # Start with two blocks worth of As
+    # insert = b'A' * 2 * blocksize
+    # cipher = blockcipher(insert)
+    # cipherblocks = [ cipher[i*blocksize:(i+1)*blocksize] for i in range(numBlocks) ]
+    # # If we detect repeated blocks then the As have filled up two full blocks.
+    # # We must be inserting into the block just before the repeats
+    # extras = 0
+    # while len(cipherblocks) == len(set(cipherblocks)):
+    #     insert += b'A'
+    #     extras += 1
+    #     cipher = blockcipher(insert)
+    #     numBlocks = len(cipher) // blocksize
+    #     cipherblocks = [ cipher[i*blocksize:(i+1)*blocksize] for i in range(numBlocks) ]
+    
+    # # Find the repeated block
+    # numBlocks = len(cipher) // blocksize
+    # for i in range(numBlocks-1):
+    #     thisblock = cipher[blocksize*i:blocksize*(i+1)]
+    #     nextblock = cipher[blocksize*(i+1):blocksize*(i+2)]
+    #     if thisblock == nextblock:
+    #         break
+    # insertIndex = blocksize * i - extras
+    # return insertIndex
