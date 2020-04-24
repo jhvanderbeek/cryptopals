@@ -1,19 +1,12 @@
-# Make a list of non-printable characters
-nonprintable = list(range(32))
-nonprintable.remove(9)
-nonprintable.remove(10)
-nonprintable.remove(13)
-
-nonprintable = bytes(nonprintable)
-
 def stripPadding( text ):
-    """Returns the text minus any \x04 padding at the end of the string"""
-    while text[-1] in nonprintable:
-        if text[-1] == 4:
-            text = text[:-1]
-        else:
-            raise ValueError("Bad padding!")
-    return text
+    """Returns the text minus padding at the end of the string"""
+    count = int(text[-1])
+    check = text[-count:]
+    check = [ int(padbyte) == count for padbyte in check ]
+    if all(check):
+        return text[:-count]
+    else:
+        raise ValueError("Invalid padding!")
     
 trial = b"ICE ICE BABY\x04\x04\x04\x04"
 trial = stripPadding(trial)

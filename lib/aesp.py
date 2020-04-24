@@ -8,8 +8,8 @@ BLOCK_SIZE = 16
 def pad( text ):
     """Adds padding to a string of bytes to make it a multiple of BLOCK_SIZE."""
     r = len(text)%BLOCK_SIZE
-    to_add = BLOCK_SIZE - r if r != 0 else 0
-    return text + b'\x04'*(to_add)
+    to_add = BLOCK_SIZE - r
+    return text + bytes([to_add])*(to_add)
 
 def AES_ECB_encrypt( plaintext, key ):
     """Encrypts the plaintext using a 128 bit key in ECB mode. Plaintext is 
@@ -122,8 +122,6 @@ def profile_for( usermail ):
 
 def oracle13( usermail ):
     """Generates a user profile using usermail and encrypts it"""
-    random.seed(1)
-    key = getrandkey( KEY_SIZE )
     profile = profile_for( usermail )
     return AES_ECB_encrypt( profile.encode(), key )
 
@@ -232,28 +230,11 @@ def determineInsertPosition( blockcipher, blocksize ):
 
     return blocksize*(startblock + 1) - count
 
-    # if len(cipherblocks) != len(set(cipherblocks)):
-    #     print("Repeat blocks found in unaltered cipher watch out!!!")
-    # # Start with two blocks worth of As
-    # insert = b'A' * 2 * blocksize
-    # cipher = blockcipher(insert)
-    # cipherblocks = [ cipher[i*blocksize:(i+1)*blocksize] for i in range(numBlocks) ]
-    # # If we detect repeated blocks then the As have filled up two full blocks.
-    # # We must be inserting into the block just before the repeats
-    # extras = 0
-    # while len(cipherblocks) == len(set(cipherblocks)):
-    #     insert += b'A'
-    #     extras += 1
-    #     cipher = blockcipher(insert)
-    #     numBlocks = len(cipher) // blocksize
-    #     cipherblocks = [ cipher[i*blocksize:(i+1)*blocksize] for i in range(numBlocks) ]
-    
-    # # Find the repeated block
-    # numBlocks = len(cipher) // blocksize
-    # for i in range(numBlocks-1):
-    #     thisblock = cipher[blocksize*i:blocksize*(i+1)]
-    #     nextblock = cipher[blocksize*(i+1):blocksize*(i+2)]
-    #     if thisblock == nextblock:
-    #         break
-    # insertIndex = blocksize * i - extras
-    # return insertIndex
+# Challenge 17 functions
+
+def oracle17():
+    """Chooses a random plaintext from 17.txt, encrypts it under CBC, then returns the encrypted text and the IV"""
+    with open("17.txt", 'r') as f:
+        lines = f.readlines()
+        line = b64decode(random.choice(lines))
+    return AES_CBC_encrypt(line, KEY, IV), IV

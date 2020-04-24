@@ -19,11 +19,11 @@ while ( len(cipher) == initialsize ):
     cipher = oracle12( prefix )
 # Now start counting how many until the next jump
 initialsize = len(cipher)
-blocksize = 0
+initialprefix = len(prefix)
 while ( len(cipher) == initialsize ):
     prefix += b'A'
-    blocksize += 1
     cipher = oracle12( prefix )
+blocksize = len(prefix) - initialprefix
 
 # Now we want to add prefixes so that the ith cipher character is on the end of a block
 numBlocks = len(oracle12(b'')) // blocksize
@@ -50,7 +50,14 @@ for block in range(numBlocks):
         cipher = oracle12( prefix )
         # Find the match in the lookup table
         nextByteBlock = cipher[ block*blocksize : (block+1)*blocksize ]
-        nextByte = lookup.index( nextByteBlock )
+        try:
+            nextByte = lookup.index( nextByteBlock )
+        except ValueError:
+            if len(plaintext) > initialsize - 2*blocksize:
+                print(plaintext)
+                exit()
+            else:
+                raise ValueError("Byte not found and there is text to be deciphered!")
         # Add the decrypted character to the plaintext
         plaintext += bytes([nextByte])
         
