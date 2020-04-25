@@ -11,6 +11,13 @@ def pad( text ):
     to_add = BLOCK_SIZE - r
     return text + bytes([to_add])*(to_add)
 
+def padding_is_valid( text ):
+    """Returns the text minus padding at the end of the string"""
+    count = int(text[-1])
+    check = text[-count:]
+    check = [ int(padbyte) == count for padbyte in check ]
+    return all(check)
+
 def AES_ECB_encrypt( plaintext, key ):
     """Encrypts the plaintext using a 128 bit key in ECB mode. Plaintext is 
     automatically padded as necessary."""
@@ -231,10 +238,16 @@ def determineInsertPosition( blockcipher, blocksize ):
     return blocksize*(startblock + 1) - count
 
 # Challenge 17 functions
-
+KEY17 = KEY
+IV17 = IV
 def oracle17():
     """Chooses a random plaintext from 17.txt, encrypts it under CBC, then returns the encrypted text and the IV"""
-    with open("17.txt", 'r') as f:
+    with open("/home/daniel/Projects/cryptopals/set3/17.txt", 'r') as f:
         lines = f.readlines()
         line = b64decode(random.choice(lines))
-    return AES_CBC_encrypt(line, KEY, IV), IV
+    return AES_CBC_encrypt(line, KEY17, IV17), IV17
+
+def validPadding( cipher, iv ):
+    """Decrypts cipher using KEY17 and iv then check the padding and returns True or False based on the validity of the padding"""
+    plain = AES_CBC_decrypt(cipher, KEY17, iv)
+    return padding_is_valid(plain)
